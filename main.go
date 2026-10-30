@@ -2,17 +2,51 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"sync"
+
+	"github.com/segmentio/kafka-go"
 )
 
 var (
-	margoURL = env("MARGO_URL", "http://localhost:8081")
 	edithURL = env("EDITH_URL", "http://localhost:8082")
+	kafkaURL = env("KAFKA_URL", "localhost:9092")
+
+	// Assets learned from Margo's asset-updates topic; only these can be served.
+	assetsMu sync.RWMutex
+	assets   = map[string]asset{}
 )
+
+func consumeAssets() {
+	r := kafka.NewReader(kafka.ReaderConfig{
+		Brokers: []string{kafkaURL},
+		Topic:   "asset-updates",
+		GroupID: "agnes",
+		// Start from the beginning on first run so we see everything Margo published.
+		StartOffset: kafka.FirstOffset,
+	})
+	for {
+		m, err := r.ReadMessage(context.Background())
+		if err != nil {
+			log.Println("kafka read error:", err)
+			continue
+		}
+		var a asset
+		if err := json.Unmarshal(m.Value, &a); err != nil {
+			log.Println("bad asset message:", err)
+			continue
+		}
+		assetsMu.Lock()
+		assets[a.ID] = a
+		assetsMu.Unlock()
+		log.Printf("asset %s -> %s", a.ID, a.Status)
+	}
+}
 
 func env(key, def string) string {
 	if v := os.Getenv(key); v != "" {
@@ -48,7 +82,7 @@ func getJSON(url string, out any) (int, error) {
 }
 
 // GET /play/{assetId}?viewerId=x
-// Only Margo-approved assets are served; an ad is fetched from Edith.
+// Only assets Margo approved (learned via Kafka) are served; an ad is fetched from Edith.
 func play(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("assetId")
 	viewer := r.URL.Query().Get("viewerId")
@@ -56,13 +90,10 @@ func play(w http.ResponseWriter, r *http.Request) {
 		viewer = "anonymous"
 	}
 
-	var a asset
-	code, err := getJSON(fmt.Sprintf("%s/assets/%s", margoURL, id), &a)
-	if err != nil {
-		http.Error(w, "margo unreachable: "+err.Error(), http.StatusBadGateway)
-		return
-	}
-	if code == http.StatusNotFound {
+	assetsMu.RLock()
+	a, ok := assets[id]
+	assetsMu.RUnlock()
+	if !ok {
 		http.Error(w, "unknown asset", http.StatusNotFound)
 		return
 	}
@@ -98,6 +129,8 @@ func complete(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	go consumeAssets()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /play/{assetId}", play)
 	mux.HandleFunc("POST /play/{assetId}/complete", complete)
