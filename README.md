@@ -1,7 +1,8 @@
 # Agnes
-
 - HLS playback service
 - full name: Adaptive Gateway for Networked Edge Streaming
+
+<img src="/agnes.gif" width="200" alt="Agnes GIF">
 
 ## What's going on here
 
