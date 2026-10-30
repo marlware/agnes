@@ -27,6 +27,8 @@ func consumeAssets() {
 		Brokers: []string{kafkaURL},
 		Topic:   "asset-updates",
 		GroupID: "agnes",
+		// Pick up the topic if Margo creates it after we start.
+		WatchPartitionChanges: true,
 		// Start from the beginning on first run so we see everything Margo published.
 		StartOffset: kafka.FirstOffset,
 	})
