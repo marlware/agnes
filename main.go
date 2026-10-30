@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -52,10 +54,14 @@ func consumeAssets() {
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{kafkaURL},
 		Topic:   "asset-updates",
-		GroupID: "agnes",
-		// Start from the beginning on first run so we see everything Margo published.
-		StartOffset: kafka.FirstOffset,
+		// No consumer group: the asset map lives in memory, so every start must replay the
+		// whole topic. The topic has a single partition (see ensureTopic).
+		Partition: 0,
+		MaxWait:   500 * time.Millisecond,
 	})
+	if err := r.SetOffset(kafka.FirstOffset); err != nil {
+		log.Fatal(err)
+	}
 	for {
 		m, err := r.ReadMessage(context.Background())
 		if err != nil {
@@ -156,13 +162,41 @@ func complete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// hlsTypes sets HLS content types (the OS mime table can't be relied on for these) and
+// only serves videos Margo approved. By convention a video lives in a folder named after
+// its asset id; ads live under ads/ and are always served.
+func hlsTypes(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if id, _, _ := strings.Cut(r.URL.Path, "/"); id != "ads" {
+			assetsMu.RLock()
+			a, ok := assets[id]
+			assetsMu.RUnlock()
+			if !ok {
+				http.Error(w, "unknown asset", http.StatusNotFound)
+				return
+			}
+			if a.Status != "APPROVED" {
+				http.Error(w, "asset not approved by margo", http.StatusForbidden)
+				return
+			}
+		}
+		switch path.Ext(r.URL.Path) {
+		case ".m3u8":
+			w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+		case ".ts":
+			w.Header().Set("Content-Type", "video/mp2t")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	go consumeAssets()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /play/{assetId}", play)
 	mux.HandleFunc("POST /play/{assetId}/complete", complete)
-	mux.Handle("/hls/", http.StripPrefix("/hls/", http.FileServer(http.Dir("hls"))))
+	mux.Handle("/hls/", http.StripPrefix("/hls/", hlsTypes(http.FileServer(http.Dir("hls")))))
 
 	log.Println("agnes listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
