@@ -1,16 +1,15 @@
 # Agnes
 
-HLS Playback Service
+- HLS playback service
+- full name: Adaptive Gateway for Networked Edge Streaming
 
 ## What's going on here
 
-Agnes is one of three small projects. Together, they pretend to be a video streaming service. Think of a tiny version of what's behind Netflix or YouTube. Everything is simulated, so the "videos" and "ads" are generated test patterns. But the pieces really do talk to each other.
+Agnes is one of three small projects. Together, they pretend to be a video streaming service. Everything is simulated, so the "videos" and "ads" are generated test patterns. But the pieces really do talk to each other.
 
 - **[Margo](https://github.com/marlware/margo)** checks new videos before anyone can watch them
 - **[Edith](https://github.com/marlware/edith)** picks which ad to show and counts how many times each ad was seen
 - **Agnes** (this one) streams the videos to viewers and plays the ads
-
-Fun fact: the name stands for Adaptive Gateway for Networked Edge Streaming.
 
 ## What a viewing looks like
 
@@ -36,6 +35,19 @@ There's a small Kotlin app in the `android` folder. It does the viewer's part.
 - Reports back when the ad is done
 
 I built it with a Pixel 8 Pro in mind. But I haven't run it on a real phone yet. So treat it as built, but not battle-tested.
+
+## Why these technologies
+
+Every tool here earns its spot. Here's what each one does for Agnes.
+
+- **Go** makes small, fast programs with a web server built in, and it handles lots of viewers at once without much effort
+- **HLS** chops a video into little pieces, so playback starts fast and keeps going smoothly
+- **ffmpeg** makes the test videos, so you don't need any real footage
+- **Kafka** lets Agnes hear about approved videos and report finished ads without being tied to Margo or Edith
+- **Kotlin** is the main language for Android apps
+- **Media3** is Google's player library, and it handles HLS playback for you
+- **Node** runs the stress-test script without any extra setup
+- **Docker** runs Kafka for you, so there's nothing to install by hand
 
 ## Trying it out
 
