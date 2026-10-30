@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -20,15 +20,39 @@ var (
 	// Assets learned from Margo's asset-updates topic; only these can be served.
 	assetsMu sync.RWMutex
 	assets   = map[string]asset{}
+
+	// Ad impressions go to Edith through Kafka.
+	impressions = &kafka.Writer{
+		Addr:                   kafka.TCP(kafkaURL),
+		Topic:                  "ad-impressions",
+		AllowAutoTopicCreation: true,
+		BatchTimeout:           10 * time.Millisecond,
+	}
 )
 
+// ensureTopic creates the topic if needed. A consumer that joins before the topic
+// exists is assigned no partitions and never recovers, so create it up front.
+func ensureTopic(topic string) {
+	for {
+		conn, err := kafka.Dial("tcp", kafkaURL)
+		if err == nil {
+			err = conn.CreateTopics(kafka.TopicConfig{Topic: topic, NumPartitions: 1, ReplicationFactor: 1})
+			conn.Close()
+		}
+		if err == nil {
+			return
+		}
+		log.Println("waiting for kafka:", err)
+		time.Sleep(2 * time.Second)
+	}
+}
+
 func consumeAssets() {
+	ensureTopic("asset-updates")
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{kafkaURL},
 		Topic:   "asset-updates",
 		GroupID: "agnes",
-		// Pick up the topic if Margo creates it after we start.
-		WatchPartitionChanges: true,
 		// Start from the beginning on first run so we see everything Margo published.
 		StartOffset: kafka.FirstOffset,
 	})
@@ -114,20 +138,22 @@ func play(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /play/{assetId}/complete?viewerId=x&adId=y
-// Called by the player after the ad plays; forwards the impression to Edith.
+// Called by the player after the ad plays; publishes the impression to Kafka for Edith.
 func complete(w http.ResponseWriter, r *http.Request) {
 	body, _ := json.Marshal(map[string]string{
 		"adId":     r.URL.Query().Get("adId"),
 		"viewerId": r.URL.Query().Get("viewerId"),
 		"assetId":  r.PathValue("assetId"),
 	})
-	resp, err := http.Post(edithURL+"/impressions", "application/json", bytes.NewReader(body))
+	err := impressions.WriteMessages(r.Context(), kafka.Message{
+		Key:   []byte(r.URL.Query().Get("viewerId")),
+		Value: body,
+	})
 	if err != nil {
-		http.Error(w, "edith unreachable: "+err.Error(), http.StatusBadGateway)
+		http.Error(w, "kafka unavailable: "+err.Error(), http.StatusBadGateway)
 		return
 	}
-	defer resp.Body.Close()
-	w.WriteHeader(resp.StatusCode)
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func main() {
