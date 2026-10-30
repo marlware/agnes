@@ -1,40 +1,60 @@
 # Agnes
 
-Adaptive Gateway for Networked Edge Streaming
+HLS Playback Service
 
 ## What's going on here
 
-Agnes is one of three small projects that together pretend to be a video streaming service, kind of like a baby version of what sits behind Netflix or YouTube. Everything is simulated, so the "videos" and "ads" are generated test patterns, but the way the pieces talk to each other is the real deal.
+Agnes is one of three small projects. Together, they pretend to be a video streaming service. Think of a tiny version of what's behind Netflix or YouTube. Everything is simulated, so the "videos" and "ads" are generated test patterns. But the pieces really do talk to each other.
 
 - **[Margo](https://github.com/marlware/margo)** checks new videos before anyone can watch them
-- **Agnes** (this one) is the part viewers actually talk to, since it streams the videos and shows ads
-- **[Edith](https://github.com/marlware/edith)** picks which ad to show and counts how many times each one was seen
+- **[Edith](https://github.com/marlware/edith)** picks which ad to show and counts how many times each ad was seen
+- **Agnes** (this one) streams the videos to viewers and plays the ads
+
+Fun fact: the name stands for Adaptive Gateway for Networked Edge Streaming.
 
 ## What a viewing looks like
 
-Here is the whole story of one person pressing play:
+Here's the whole story of one person pressing play.
 
-- Margo has already checked the video and announced that it is approved, and Agnes heard that announcement and remembers it
-- The viewer asks Agnes to play a video, and Agnes makes sure it was approved (rejected or unknown videos get turned away)
+- Margo already checked the video and announced that it's approved
+- Agnes heard that announcement and remembers it
+- The viewer asks Agnes to play a video
+- Agnes makes sure the video was approved, and turns away rejected or unknown ones
 - Agnes asks Edith for an ad that suits this viewer
 - The viewer's phone plays the ad first, then the video
-- When the ad finishes, Agnes tells Edith that this person just saw that ad, so it gets counted
+- When the ad finishes, Agnes tells Edith that this person just saw it
+- Edith counts the view
 
-The videos are streamed in the HLS format, which chops a video into little pieces that get sent one at a time. It is the same trick real streaming services use so that playback can start fast and keep going smoothly.
+The videos are streamed in a format called HLS. It chops a video into little pieces and sends them one at a time. Real streaming services use the same trick. It lets playback start fast and keep going smoothly.
 
 ## The Android app
 
-There is a small Kotlin app in the `android` folder that does the viewer's part. It asks Agnes what to play, plays the ad and then the video using Google's Media3 player, and reports back when the ad is done. I built it with a Pixel 8 Pro in mind, but I haven't had it run on a real phone yet, so treat it as built but not battle-tested.
+There's a small Kotlin app in the `android` folder. It does the viewer's part.
+
+- Asks Agnes what to play
+- Plays the ad, then the video, using Google's Media3 player
+- Reports back when the ad is done
+
+I built it with a Pixel 8 Pro in mind. But I haven't run it on a real phone yet. So treat it as built, but not battle-tested.
 
 ## Trying it out
 
-You will need Go, Docker, ffmpeg (to make the test videos), and the other two projects running. Here is the order to do things in:
+Here's what you'll need.
+
+- Go
+- Docker
+- ffmpeg, to make the test videos
+- The other two projects running
+
+Then do things in this order.
 
 - Start the shared stack from the Margo repo with `docker compose up -d`
-- Start Margo, then Edith, since their READMEs have the commands
-- Make the test videos with `FFMPEG=/path/to/ffmpeg scripts/make-hls.sh` (or just `scripts/make-hls.sh` if ffmpeg is on your PATH), which creates a 30 second demo and three short ads in a `hls` folder
-- Start Agnes with `go run .`, which listens on port 8080 and is ready a few seconds after launch
-- Press play, sort of, with these requests:
+- Start Margo, then Edith (their READMEs have the commands)
+- Make the test videos with `FFMPEG=/path/to/ffmpeg scripts/make-hls.sh`
+- Skip the `FFMPEG=` part if ffmpeg is already on your PATH
+- That creates a 30 second demo and three short ads in a `hls` folder
+- Start Agnes with `go run .` (it listens on port 8080 and is ready a few seconds after launch)
+- Press play, sort of, with the requests below
 
 ```
 curl "localhost:8080/play/demo?viewerId=alice"       # approved, you get the video plus an ad
@@ -42,26 +62,36 @@ curl "localhost:8080/play/broken?viewerId=alice"     # turned away, Margo reject
 curl -X POST "localhost:8080/play/demo/complete?viewerId=alice&adId=ad-1"   # "alice saw the ad"
 ```
 
-- Check `localhost:8082/impressions` afterwards, and Edith will have the note
+- Check `localhost:8082/impressions` afterwards to see Edith's note
 
 ## Running the Android app
 
-You will need the Android SDK (platform 36) and a Java between 17 and 21. Then:
+Here's what you'll need.
+
+- The Android SDK (platform 36)
+- A Java between 17 and 21
+
+Then do these steps.
 
 - Put the SDK location in `android/local.properties` as `sdk.dir=...`
-- Build it with `cd android && ./gradlew assembleDebug`
-- Plug in your phone with USB debugging on, with the whole stack running
+- Build with `cd android && ./gradlew assembleDebug`
+- Plug in your phone with USB debugging on
+- Make sure the whole stack is running
 - Run `adb reverse tcp:8080 tcp:8080` so the phone can reach Agnes on your computer
-- Install with `adb install -r app/build/outputs/apk/debug/app-debug.apk`, then open Agnes on the phone
-- If you would rather skip the USB cable, launch it with your computer's address instead: `adb shell am start -n app.marlware.agnes/.MainActivity -e base http://<your-ip>:8080`
+- Install with `adb install -r app/build/outputs/apk/debug/app-debug.apk`
+- Open Agnes on the phone
+- No USB cable? Launch with your computer's address instead: `adb shell am start -n app.marlware.agnes/.MainActivity -e base http://<your-ip>:8080`
 
 ## Stress test
 
-Running `node scripts/load-impressions.mjs` fakes 10,000 people finishing an ad. You can watch Edith's counts climb at `localhost:8082/stats`.
+Running `node scripts/load-impressions.mjs` fakes 10,000 people finishing an ad. Watch Edith's counts climb at `localhost:8082/stats`.
 
 ## Good to know
 
-- Agnes keeps what it knows about videos in memory, but it re-reads Margo's whole announcement history every time it starts, so a restart doesn't make it forget anything
-- Ads are always playable, while videos are only playable if Margo approved them
-- OpenTelemetry and AWS are on the wishlist but aren't built yet
-- The endpoints, if you want them, are `GET /play/{assetId}`, `POST /play/{assetId}/complete`, and `/hls/...` for the video files themselves
+- Agnes keeps what it knows about videos in memory
+- But it re-reads Margo's whole announcement history on every start
+- So a restart doesn't make it forget anything
+- Ads are always playable
+- Videos only play if Margo approved them
+- OpenTelemetry and AWS are on the wishlist, but they aren't built yet
+- The endpoints are `GET /play/{assetId}`, `POST /play/{assetId}/complete`, and `/hls/...` for the video files
