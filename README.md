@@ -50,17 +50,7 @@ I built it with a Pixel 8 Pro in mind. But I haven't run it on a real phone yet.
 
 Here's how the pieces connect.
 
-```mermaid
-flowchart LR
-    Phone["Android app: Kotlin + Media3"] -->|play| Agnes["Agnes: Go"]
-    Agnes -->|HLS video| Phone
-    Margo["Margo"] -->|approved videos| Kafka["Kafka"]
-    Kafka --> Agnes
-    Agnes -->|asks for an ad| Edith["Edith"]
-    Agnes -->|ad was seen| Kafka
-    Kafka --> Edith
-    ffmpeg["ffmpeg"] -.->|makes test videos| Agnes
-```
+<img src="docs/diagram.svg" alt="How the Android app, Agnes, Margo, Kafka, and Edith connect">
 
 ## Trying it out
 

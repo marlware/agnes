@@ -1,0 +1,27 @@
+# Regenerate: d2 --layout elk --pad 30 docs/diagram.d2 docs/diagram.svg
+direction: right
+*.style.border-radius: 14
+
+phone: Android app {
+  grid-rows: 1
+  kotlin: Kotlin {shape: image; icon: https://cdn.simpleicons.org/kotlin; width: 56; height: 56}
+  android: Android {shape: image; icon: https://cdn.simpleicons.org/android; width: 56; height: 56}
+}
+
+agnes: Agnes {
+  go: Go {shape: image; icon: https://cdn.simpleicons.org/go; width: 56; height: 56}
+}
+
+margo: Margo
+kafka: Kafka {shape: image; icon: https://cdn.simpleicons.org/apachekafka; width: 72; height: 72}
+edith: Edith
+ffmpeg: ffmpeg {shape: image; icon: https://cdn.simpleicons.org/ffmpeg; width: 56; height: 56}
+
+phone -> agnes: play
+agnes -> phone: HLS video
+margo -> kafka: approved videos
+kafka -> agnes
+agnes -> kafka: ad was seen
+agnes -> edith: asks for an ad
+kafka -> edith
+ffmpeg -> agnes: makes test videos {style.stroke-dash: 4}
