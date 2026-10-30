@@ -39,16 +39,14 @@ I built it with a Pixel 8 Pro in mind. But I haven't run it on a real phone yet.
 
 ## Why these technologies
 
-Every tool here earns its spot. Here's what each one does for Agnes.
-
-- **Go** makes small, fast programs with a web server built in, and it handles lots of viewers at once without much effort
-- **HLS** chops a video into little pieces, so playback starts fast and keeps going smoothly
-- **ffmpeg** makes the test videos, so you don't need any real footage
-- **Kafka** lets Agnes hear about approved videos and report finished ads without being tied to Margo or Edith
+- **Go** makes small, fast web servers
+- **HLS** splits video into pieces so playback starts fast
+- **ffmpeg** makes the test videos
+- **Kafka** lets Agnes hear about approved videos
 - **Kotlin** is the main language for Android apps
-- **Media3** is Google's player library, and it handles HLS playback for you
-- **Node** runs the stress-test script without any extra setup
-- **Docker** runs Kafka for you, so there's nothing to install by hand
+- **Media3** is Google's video player library
+- **Node** runs the stress test
+- **Docker** runs Kafka
 
 ## Trying it out
 
