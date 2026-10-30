@@ -1,6 +1,7 @@
 # Agnes
-
 HLS Playback Service
+
+<img src="/agnes.gif" width="200" alt="Agnes GIF">
 
 ## What's going on here
 
