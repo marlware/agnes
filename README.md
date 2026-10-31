@@ -48,8 +48,6 @@ I built it with a Pixel 8 Pro in mind. But I haven't run it on a real phone yet.
 - **Node** runs the stress test
 - **Docker** runs Kafka
 
-Here's how the pieces connect.
-
 <img src="docs/diagram.svg" alt="How the Android app, Agnes, Margo, Kafka, and Edith connect">
 
 ## Trying it out
